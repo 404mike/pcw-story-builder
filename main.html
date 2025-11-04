@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Universal Viewer</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/universalviewer@4.0.0/dist/uv.css"
+    />
+    <script
+      type="application/javascript"
+      src="dist/umd/UV.js"
+    ></script>
+    <style>
+      #uv {
+        width: 924px;
+        height: 668px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="uv" id="uv"></div>
+
+    <script>
+      var urlAdapter = new UV.IIIFURLAdapter();
+
+      var data = {
+        manifest: "https://wellcomelibrary.org/iiif/b18035723/manifest",
+        embedded: true, // needed for codesandbox frame
+        collectionIndex:
+          urlAdapter.get("c") !== undefined
+            ? Number(urlAdapter.get("c"))
+            : undefined,
+        manifestIndex: Number(urlAdapter.get("m", 0)),
+        canvasIndex: Number(urlAdapter.get("cv", 0)),
+        rotation: Number(urlAdapter.get("r", 0)),
+        rangeId: urlAdapter.get("rid", ""),
+        xywh: urlAdapter.get("xywh", ""),
+        target: urlAdapter.get("target", "")
+      };
+
+      var uv = UV.init("uv", data);
+
+      // normally you would call
+      // urlAdapter.bindTo(uv);
+      // which then handles events internally
+      // but here we're handling them ourselves instead
+
+      uv.on(
+        "collectionIndexChange",
+        function (collectionIndex) {
+          urlAdapter.set("c", collectionIndex);
+        },
+        false
+      );
+
+      uv.on(
+        "manifestIndexChange",
+        function (manifestIndex) {
+          urlAdapter.set("m", manifestIndex);
+        },
+        false
+      );
+
+      uv.on(
+        "canvasIndexChange",
+        function (canvasIndex) {
+          urlAdapter.set("cv", canvasIndex);
+        },
+        false
+      );
+
+      uv.on(
+        "rangeChange",
+        function (rangeId) {
+          urlAdapter.set("rid", rangeId);
+        },
+        false
+      );
+
+      uv.on("targetChange", function (target) {
+        urlAdapter.set("xywh", urlAdapter.getFragment("xywh", target));
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Universal Viewer</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/universalviewer@4.0.0/dist/uv.css"
+    />
+    <script
+      type="application/javascript"
+      src="dist/umd/UV.js"
+    ></script>
+    <style>
+      .uv {
+        width: 924px;
+        height: 668px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="uv" id="uv" data-manifest="https://wellcomelibrary.org/iiif/b18035723/manifest"></div>
+    <div class="uv" id="uv2" style="margin-top: 20px;" data-manifest="https://wellcomelibrary.org/iiif/b18035723/manifest"></div>
+
+    <script>
+      const urlAdapter = new UV.IIIFURLAdapter();
+
+      const data = {
+        manifest: "https://wellcomelibrary.org/iiif/b18035723/manifest",
+        embedded: true, // needed for codesandbox frame
+        collectionIndex:
+          urlAdapter.get("c") !== undefined
+            ? Number(urlAdapter.get("c"))
+            : undefined,
+        manifestIndex: Number(urlAdapter.get("m", 0)),
+        canvasIndex: Number(urlAdapter.get("cv", 0)),
+        rotation: Number(urlAdapter.get("r", 0)),
+        rangeId: urlAdapter.get("rid", ""),
+        xywh: urlAdapter.get("xywh", ""),
+        target: urlAdapter.get("target", ""),
+      };
+
+      // lightweight registry so any viewer created via UV.init receives the same listeners
+      const viewerManager = (() => {
+        const viewers = new Set();
+        const listeners = [];
+
+        const attach = (viewer, listener) => {
+          viewer.on(
+            listener.name,
+            function (...args) {
+              listener.cb(viewer, ...args);
+            },
+            listener.ctx
+          );
+        };
+
+        return {
+          addListener(name, cb, ctx) {
+            const listener = { name, cb, ctx };
+            listeners.push(listener);
+            viewers.forEach((viewer) => attach(viewer, listener));
+          },
+          register(viewer, source) {
+            if (!viewer) {
+              return viewer;
+            }
+
+            const label =
+              typeof source === "string"
+                ? source
+                : source && source.id
+                ? source.id
+                : viewer.__label;
+
+            if (label) {
+              viewer.__label = label;
+            }
+
+            if (!viewers.has(viewer)) {
+              viewers.add(viewer);
+              listeners.forEach((listener) => attach(viewer, listener));
+
+              const originalDispose = viewer.dispose;
+              viewer.dispose = function (...args) {
+                viewers.delete(viewer);
+                return originalDispose.apply(viewer, args);
+              };
+
+              console.log(
+                `[viewer-manager] registered`,
+                viewer.__label || "(anonymous viewer)"
+              );
+            }
+
+            return viewer;
+          },
+        };
+      })();
+
+      const originalInit = UV.init.bind(UV);
+      UV.init = function (el, initData) {
+        const viewer = originalInit(el, initData);
+        return viewerManager.register(viewer, el);
+      };
+
+      const listenToAll = (...args) => viewerManager.addListener(...args);
+
+      listenToAll("collectionIndexChange", (_viewer, collectionIndex) => {
+        urlAdapter.set("c", collectionIndex);
+      });
+
+      listenToAll("manifestIndexChange", (viewer, manifestIndex) => {
+        urlAdapter.set("m", manifestIndex);
+        console.log(
+          `[${viewer.__label || "viewer"}] manifestIndexChange`,
+          manifestIndex
+        );
+      });
+
+      listenToAll("canvasIndexChange", (viewer, canvasIndex) => {
+        urlAdapter.set("cv", canvasIndex);
+        console.log(
+          `[${viewer.__label || "viewer"}] canvasIndexChange`,
+          canvasIndex
+        );
+      });
+
+      listenToAll("rangeChange", (viewer, rangeId) => {
+        urlAdapter.set("rid", rangeId);
+        console.log(`[${viewer.__label || "viewer"}] rangeChange`, rangeId);
+      });
+
+      listenToAll("targetChange", (viewer, target) => {
+        const fragment = urlAdapter.getFragment("xywh", target);
+        urlAdapter.set("xywh", fragment);
+        console.log(`[${viewer.__label || "viewer"}] targetChange`, fragment);
+      });
+
+      const uv = UV.init("uv", data);
+      viewerManager.register(uv, "uv");
+      const uv2 = UV.init("uv2", data);
+      viewerManager.register(uv2, "uv2");
+
+      // normally you would call urlAdapter.bindTo(uv);
+      // which then handles events internally. We're keeping the custom handler
+      // example here so the shared listener wiring is clear.
+    </script>
+  </body>
+</html>
