@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Universal Viewer</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/universalviewer@4.0.0/dist/uv.css"
+    />
+    <script
+      type="application/javascript"
+      src="dist/umd/UV.js"
+    ></script>
+    <style>
+      .uv {
+        width: 924px;
+        height: 668px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="uv" id="uv" data-manifest="https://wellcomelibrary.org/iiif/b18035723/manifest"></div>
+    <div class="uv" id="uv2" style="margin-top: 20px;" data-manifest="https://wellcomelibrary.org/iiif/b18035723/manifest"></div>
+
+<script>
+  // ---- URL adapter & base data pulled once ----
+  const urlAdapter = new UV.IIIFURLAdapter();
+  const baseDataFromURL = () => ({
+    embedded: true, // keep if you're embedding in a frame; otherwise remove
+    collectionIndex:
+      urlAdapter.get("c") !== undefined ? Number(urlAdapter.get("c")) : undefined,
+    manifestIndex: Number(urlAdapter.get("m", 0)),
+    canvasIndex: Number(urlAdapter.get("cv", 0)),
+    rotation: Number(urlAdapter.get("r", 0)),
+    rangeId: urlAdapter.get("rid", ""),
+    xywh: urlAdapter.get("xywh", ""),
+    target: urlAdapter.get("target", ""),
+  });
+
+  // ---- Simple viewer manager so all UV instances get the same listeners ----
+  const viewerManager = (() => {
+    const viewers = new Set();
+    const listeners = [];
+    const attach = (viewer, listener) => {
+      viewer.on(listener.name, function (...args) {
+        listener.cb(viewer, ...args);
+      }, listener.ctx);
+    };
+    return {
+      addListener(name, cb, ctx) {
+        const listener = { name, cb, ctx };
+        listeners.push(listener);
+        viewers.forEach(v => attach(v, listener));
+      },
+      register(viewer, label) {
+        if (!viewer || viewers.has(viewer)) return viewer;
+        if (label) viewer.__label = label;
+        viewers.add(viewer);
+        listeners.forEach(l => attach(viewer, l));
+
+        const originalDispose = viewer.dispose;
+        viewer.dispose = function (...args) {
+          viewers.delete(viewer);
+          return originalDispose.apply(viewer, args);
+        };
+        return viewer;
+      },
+      list() { return Array.from(viewers); }
+    };
+  })();
+
+  // ---- Patch UV.init once so anything created goes through the manager ----
+  const originalInit = UV.init.bind(UV);
+  UV.init = function (el, initData) {
+    const viewer = originalInit(el, initData);
+    return viewerManager.register(viewer, el?.id || el?.getAttribute?.("id"));
+  };
+
+  // ---- Shared listeners (update URL params + logs) ----
+  const listenToAll = (...args) => viewerManager.addListener(...args);
+
+  listenToAll("collectionIndexChange", (_viewer, collectionIndex) => {
+    urlAdapter.set("c", collectionIndex);
+  });
+  listenToAll("manifestIndexChange", (viewer, manifestIndex) => {
+    urlAdapter.set("m", manifestIndex);
+    console.log(`[${viewer.__label || "viewer"}] manifestIndexChange`, manifestIndex);
+  });
+  listenToAll("canvasIndexChange", (viewer, canvasIndex) => {
+    urlAdapter.set("cv", canvasIndex);
+    console.log(`[${viewer.__label || "viewer"}] canvasIndexChange`, canvasIndex);
+  });
+  listenToAll("rangeChange", (viewer, rangeId) => {
+    urlAdapter.set("rid", rangeId);
+    console.log(`[${viewer.__label || "viewer"}] rangeChange`, rangeId);
+  });
+  listenToAll("targetChange", (viewer, target) => {
+    const fragment = urlAdapter.getFragment("xywh", target);
+    urlAdapter.set("xywh", fragment);
+    console.log(`[${viewer.__label || "viewer"}] targetChange`, fragment);
+  });
+
+  // ---- Dynamic bootstrap: init, observe adds/removes, resize ----
+  (function dynamicUVBootstrap() {
+    const byEl = new WeakMap(); // element -> { viewer, resizeObserver }
+
+    function buildInitDataFor(el) {
+      // Allow overriding via data attributes:
+      // data-manifest (required), data-locale, data-config (URL to uv.json), data-embedded
+      const manifest = el.getAttribute("data-manifest");
+      const locale = el.getAttribute("data-locale");
+      const configUri = el.getAttribute("data-config");
+      const embeddedAttr = el.getAttribute("data-embedded");
+
+      const fromUrl = baseDataFromURL();
+      const initData = {
+        ...fromUrl,
+        manifest,
+      };
+      if (locale) initData.locale = { resource: `locales/${locale}.json`, name: locale };
+      if (configUri) initData.configUri = configUri;
+      if (embeddedAttr != null) initData.embedded = embeddedAttr === "true";
+      return initData;
+    }
+
+    function create(el) {
+      if (byEl.has(el)) return byEl.get(el).viewer;
+      const id = el.id || `(uv-${Math.random().toString(36).slice(2)})`;
+      if (!el.id) el.id = id;
+
+      const initData = buildInitDataFor(el);
+      if (!initData.manifest) {
+        console.warn(`[UV] Skipping #${id}: missing data-manifest`);
+        return null;
+      }
+
+      const viewer = UV.init(`#${id}`, initData); // goes through our patched UV.init
+      console.log(`[UV] initialised #${id}`, initData.manifest);
+
+      // Resize handling: call viewer.resize() when the element changes size
+      const ro = new ResizeObserver(() => {
+        try { viewer.resize(); } catch {}
+      });
+      ro.observe(el);
+
+      byEl.set(el, { viewer, resizeObserver: ro });
+      return viewer;
+    }
+
+    function destroy(el) {
+      const record = byEl.get(el);
+      if (!record) return;
+      record.resizeObserver.disconnect();
+      try { record.viewer.dispose(); } catch {}
+      byEl.delete(el);
+      console.log(`[UV] disposed #${el.id || "(no id)"}`);
+    }
+
+    function scan(root = document) {
+      root.querySelectorAll('.uv[data-manifest]').forEach(create);
+    }
+
+    // Observe added/removed nodes
+    const mo = new MutationObserver(mutations => {
+      for (const m of mutations) {
+        m.addedNodes.forEach(node => {
+          if (!(node instanceof HTMLElement)) return;
+          if (node.matches?.('.uv[data-manifest]')) create(node);
+          // if a subtree was added, scan it
+          if (node.querySelectorAll) scan(node);
+        });
+        m.removedNodes.forEach(node => {
+          if (node instanceof HTMLElement) {
+            if (byEl.has(node)) destroy(node);
+            node.querySelectorAll?.('.uv[data-manifest]').forEach(destroy);
+          }
+        });
+        // Attribute changes: allow swapping manifests by re-init
+        if (m.type === 'attributes' && m.attributeName === 'data-manifest') {
+          const el = m.target;
+          if (byEl.has(el)) {
+            // safest cross-version approach is re-create
+            destroy(el);
+            create(el);
+          }
+        }
+      }
+    });
+
+    mo.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-manifest']
+    });
+
+    // Initial pass
+    scan();
+
+    // Expose a tiny API for manual control if you want it
+    window.UVRegistry = {
+      create, destroy,
+      get(el) { return byEl.get(el)?.viewer || null; },
+      list() { return Array.from(byEl.keys()); }
+    };
+  })();
+
+  // ---- Example: your existing static elements are auto-initialised ----
+  // <div class="uv" id="uv"  data-manifest="..."></div>
+  // <div class="uv" id="uv2" data-manifest="..."></div>
+
+  // ---- Example: dynamically add another viewer later ----
+  // const d = document.createElement('div');
+  // d.className = 'uv';
+  // d.style.marginTop = '20px';
+  // d.setAttribute('data-manifest', 'https://wellcomelibrary.org/iiif/b18035723/manifest');
+  // document.body.appendChild(d); // auto-initialises
+</script>
+
+  </body>
+</html>

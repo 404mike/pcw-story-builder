@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Universal Viewer</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/universalviewer@4.0.0/dist/uv.css"
+    />
+    <script
+      type="application/javascript"
+      src="dist/umd/UV.js"
+    ></script>
+    <style>
+      .uv {
+        width: 924px;
+        height: 668px;
+        margin: 10px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="uv" id="node-123" 
+      data-manifest="https://wellcomelibrary.org/iiif/b18035723/manifest"
+      data-postition="1034,1739,485,352"
+      data-canvasIndexChange="0"
+    ></div>
+
+    <div class="uv" id="node-124" 
+      data-manifest="https://wellcomelibrary.org/iiif/b18035723/manifest"
+      data-postition="946,924,472,352"
+      data-canvasIndexChange="1"
+    ></div>
+
+    <div class="uv" id="node-125" 
+      data-manifest="https://wellcomelibrary.org/iiif/b18035723/manifest"
+    ></div>
+
+    <script>
+      var urlAdapter = new UV.IIIFURLAdapter();  
+      let allViewrs = document.querySelectorAll(".uv");
+      allViewrs.forEach((node) => {
+        let viewerId = node.id;
+        let manifestUrl = node.getAttribute("data-manifest");
+        let canvasIndexChange = parseInt(node.getAttribute("data-canvasIndexChange")) || 0; 
+        let position = node.getAttribute("data-postition") || "";
+
+        let data = {
+          manifest: manifestUrl,
+          embedded: true,
+          canvasIndex: canvasIndexChange,
+          xywh: position
+        };
+
+        let uvInstance = UV.init(viewerId, data);
+      });
+   </script>
+  </body>
+</html>

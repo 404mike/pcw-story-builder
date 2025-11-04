@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Universal Viewer</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/universalviewer@4.0.0/dist/uv.css"
+    />
+    <script
+      type="application/javascript"
+      src="dist/umd/UV.js"
+    ></script>
+    <style>
+      .viewer-container {
+        margin: 30px 0;
+        display: flex;
+      }
+      .uv {
+        width: 60%;
+        height: 668px;
+        float: left;
+      }
+      .output {
+        width: 35%;
+        /* height: 668px; */
+        float: right;
+        text-align: right;
+    </style>
+  </head>
+  <body>
+
+    <div class="viewer-container">
+      <div class="uv" id="node-123" 
+        data-manifest="https://wellcomelibrary.org/iiif/b18035723/manifest"
+      ></div>
+      <div class="output" id="node-123-output"></div>
+    </div>
+
+    <div class="viewer-container">
+      <div class="uv" id="node-124" 
+        data-manifest="https://wellcomelibrary.org/iiif/b18035723/manifest"
+      ></div>
+      <div class="output" id="node-124-output"></div>
+    </div>  
+
+        <div class="viewer-container">
+      <div class="uv" id="node-125" 
+        data-manifest="https://wellcomelibrary.org/iiif/b18035723/manifest"
+      ></div>
+      <div class="output" id="node-125-output"></div>
+    </div>
+
+    <script>
+      var urlAdapter = new UV.IIIFURLAdapter();  
+      let allViewrs = document.querySelectorAll(".uv");
+      allViewrs.forEach((node) => {
+        let viewerId = node.id;
+        let viewerManifest = node.getAttribute("data-manifest");
+        let viewerCanvasIndex = parseInt(node.getAttribute("data-canvasIndexChange")) || 0;
+        let viewerPosition = node.getAttribute("data-postition") || "";
+
+        let data = {
+          manifest: viewerManifest,
+          embedded: true,
+          canvasIndex: viewerCanvasIndex,
+          xywh: viewerPosition
+        };
+
+        let uvInstance = UV.init(viewerId, data);
+
+        let updateOutput = () => {
+          let outputDiv = document.getElementById(viewerId + "-output");
+          outputDiv.innerText = `Canvas index: ${viewerCanvasIndex}, Position: ${viewerPosition}`;
+        };
+
+        uvInstance.on(
+          "canvasIndexChange",
+          function (canvasIndex) {
+            viewerCanvasIndex = canvasIndex;
+            updateOutput();  
+          },
+          false
+        );
+
+        uvInstance.on("targetChange", function (target) {
+          let formattedTarget = urlAdapter.getFragment("xywh", target);
+          viewerPosition = formattedTarget;
+          updateOutput();
+        });
+      });
+   </script>
+  </body>
+</html>
