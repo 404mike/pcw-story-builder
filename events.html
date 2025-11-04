@@ -61,6 +61,8 @@
         let viewerManifest = node.getAttribute("data-manifest");
         let viewerCanvasIndex = parseInt(node.getAttribute("data-canvasIndexChange")) || 0;
         let viewerPosition = node.getAttribute("data-postition") || "";
+                  
+        let outputDiv = document.getElementById(viewerId + "-output");
 
         let data = {
           manifest: viewerManifest,
@@ -72,22 +74,16 @@
         let uvInstance = UV.init(viewerId, data);
 
         let updateOutput = () => {
-          let outputDiv = document.getElementById(viewerId + "-output");
           outputDiv.innerText = `Canvas index: ${viewerCanvasIndex}, Position: ${viewerPosition}`;
         };
 
-        uvInstance.on(
-          "canvasIndexChange",
-          function (canvasIndex) {
-            viewerCanvasIndex = canvasIndex;
-            updateOutput();  
-          },
-          false
-        );
+        uvInstance.on("canvasIndexChange", function (canvasIndex) {
+          viewerCanvasIndex = canvasIndex;
+          updateOutput();
+        });
 
         uvInstance.on("targetChange", function (target) {
-          let formattedTarget = urlAdapter.getFragment("xywh", target);
-          viewerPosition = formattedTarget;
+          viewerPosition = urlAdapter.getFragment("xywh", target);
           updateOutput();
         });
       });
