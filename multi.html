@@ -27,6 +27,11 @@
         margin-left: auto;
         margin-right: auto;
       }
+      audio {
+        display: block;
+        width: 100%;
+        margin: auto;
+      }
     </style>
   </head>
   <body>
@@ -88,9 +93,46 @@
         data-canvasIndexChange="3"
         data-postition="126,214,431,426"
       ></div>
+    
+      <p>
+        Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et 
+        dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi 
+        ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate 
+        velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, 
+        sunt in culpa qui officia deserunt mollit anim id est laborum.
+      </p>
 
+      <h2>Interview 1</h2>
+      <p>Blurb about interview 1</p>
+      <div class="audio">
+        <audio controls preload="metadata" data-start="45" data-end="59">
+          <source src="https://www.peoplescollection.wales/sites/default/files/audio/2025/October/GJ1%20%282025%20Edit%29.mp3" type="audio/mpeg">
+          Your browser does not support the audio element.
+        </audio>
+      </div>
+
+      <h2>Interview 2</h2>
+      <p>Blurb about interview 2</p>
+      <div class="audio">
+        <audio controls preload="metadata" data-start="145" data-end="157">
+          <source src="https://www.peoplescollection.wales/sites/default/files/audio/2025/October/GJ1%20%282025%20Edit%29.mp3" type="audio/mpeg">
+          Your browser does not support the audio element.
+        </audio>
+      </div>
+
+
+      <p>
+        Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et 
+        dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi 
+        ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate 
+        velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, 
+        sunt in culpa qui officia deserunt mollit anim id est laborum.
+      </p>
+
+    </div>
 
     <script>
+      //  UV controls
       var urlAdapter = new UV.IIIFURLAdapter();  
       let allViewrs = document.querySelectorAll(".uv");
       allViewrs.forEach((node) => {
@@ -108,6 +150,23 @@
 
         let uvInstance = UV.init(viewerId, data);
       });
+      // end UV
+
+      // audio controls
+      document.querySelectorAll('audio[data-start][data-end]').forEach(audio => {
+        const start = Number(audio.dataset.start) || 0;
+        const end   = Number(audio.dataset.end);
+        const source = audio.querySelector('source');
+        if (!source) return;
+
+        // Strip any existing fragment before adding ours
+        const base = source.src.split('#')[0];
+        source.src = isFinite(end) ? `${base}#t=${start},${end}` : `${base}#t=${start}`;
+
+        // Reload so the fragment takes effect
+        audio.load();
+      });
+      // end audio controls
    </script>
   </body>
 </html>
